@@ -157,6 +157,60 @@ ssh ubuntu@<vm-ip> "vi ~/.openclaw/openclaw.json"
 ssh ubuntu@<vm-ip> "cd /opt/openclaw && docker compose restart openclaw-gateway"
 ```
 
+### Configure Web Services (Brave, Serper, etc.)
+
+OpenClaw supports various web service APIs for search, scraping, and more:
+
+**Interactive Configuration:**
+
+```bash
+# Run interactive wizard for web services
+ssh ubuntu@<vm-ip> "cd /opt/openclaw && docker compose exec openclaw-gateway openclaw configure --section web"
+
+# Follow prompts to add:
+# - Brave Search API
+# - Serper.dev (Google Search)
+# - Firecrawl (web scraping)
+# - Other web services
+```
+
+**Manual Configuration:**
+
+```bash
+# Edit auth-profiles.json directly
+ssh ubuntu@<vm-ip>
+nano ~/.openclaw/agents/main/agent/auth-profiles.json
+
+# Add under "profiles" section:
+"braveapi:default": {
+  "type": "api_key",
+  "provider": "braveapi",
+  "key": "BSAxxx..."
+}
+
+# Then restart
+cd /opt/openclaw && docker compose restart openclaw-gateway
+```
+
+**Ansible Automation (Recommended):**
+
+Add to `ansible/inventory/group_vars/all.yml`:
+
+```yaml
+# Web Service API Keys (optional)
+braveapi_key: "BSAxxx..." # Brave Search API
+serper_api_key: "xxx..." # Serper.dev Google Search
+firecrawl_api_key: "fc-xxx..." # Firecrawl web scraping
+```
+
+Then run: `ansible-playbook -i inventory/hosts playbooks/site.yml`
+
+**Available Providers:**
+
+- `braveapi` - Brave Search API → https://brave.com/search/api/
+- `serper` - Serper.dev Google Search → https://serper.dev/
+- `firecrawl` - Firecrawl web scraping → https://firecrawl.dev/
+
 ## Logs & Debugging
 
 ### Container Logs

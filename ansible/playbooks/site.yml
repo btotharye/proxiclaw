@@ -20,6 +20,7 @@
     - common
     - docker
     - openclaw
+    - openclaw-backup
 
   post_tasks:
     - name: Display deployment information

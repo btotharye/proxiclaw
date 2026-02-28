@@ -1,0 +1,116 @@
+---
+# OpenClaw Backup Role
+# Backs up OpenClaw configuration and workspace metadata to a git repository
+
+- name: Check if backup is enabled
+  set_fact:
+    backup_enabled: "{{ openclaw_backup_repo | default('') | length > 0 }}"
+
+- name: Display backup status
+  debug:
+    msg: "OpenClaw backup is {{ 'enabled' if backup_enabled else 'disabled (no backup repo configured)' }}"
+
+- name: Create backup directory
+  file:
+    path: "{{ openclaw_backup_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0755"
+  when: backup_enabled
+
+- name: Initialize git repository in backup directory
+  shell: |
+    cd {{ openclaw_backup_dir }}
+    if [ ! -d .git ]; then
+      git init
+      git config user.name "OpenClaw Backup"
+      git config user.email "backup@openclaw.local"
+    fi
+  args:
+    creates: "{{ openclaw_backup_dir }}/.git"
+  when: backup_enabled
+
+- name: Add remote origin if not exists
+  shell: |
+    cd {{ openclaw_backup_dir }}
+    if ! git remote get-url origin >/dev/null 2>&1; then
+      git remote add origin {{ openclaw_backup_repo }}
+    fi
+  when: backup_enabled
+  ignore_errors: yes
+
+- name: Create backup script
+  template:
+    src: backup.sh.j2
+    dest: "{{ openclaw_backup_dir }}/backup.sh"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0755"
+  when: backup_enabled
+
+- name: Create workspace git-init script
+  template:
+    src: init-workspace-repos.sh.j2
+    dest: "/home/{{ ansible_user }}/bin/init-workspace-repos.sh"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0755"
+  when: backup_enabled
+
+- name: Ensure user bin directory exists
+  file:
+    path: "/home/{{ ansible_user }}/bin"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0755"
+
+- name: Create .gitignore for backup repo
+  copy:
+    dest: "{{ openclaw_backup_dir }}/.gitignore"
+    content: |
+      # Exclude secrets
+      auth-profiles.json
+      *.key
+      *.pem
+
+      # Exclude logs
+      *.log
+
+      # Exclude temporary files
+      *.tmp
+      *.swp
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+  when: backup_enabled
+
+- name: Run initial backup
+  shell: "{{ openclaw_backup_dir }}/backup.sh"
+  args:
+    chdir: "{{ openclaw_backup_dir }}"
+  when: backup_enabled
+  ignore_errors: yes
+  changed_when: false
+
+- name: Set up cron job for periodic backups
+  cron:
+    name: "OpenClaw configuration backup"
+    minute: "{{ openclaw_backup_cron_minute }}"
+    hour: "{{ openclaw_backup_cron_hour }}"
+    day: "{{ openclaw_backup_cron_day }}"
+    weekday: "{{ openclaw_backup_cron_weekday }}"
+    job: "{{ openclaw_backup_dir }}/backup.sh >> {{ openclaw_backup_dir }}/backup.log 2>&1"
+    user: "{{ ansible_user }}"
+    state: "{{ 'present' if backup_enabled else 'absent' }}"
+
+- name: Display backup information
+  debug:
+    msg: |
+      ✓ OpenClaw backup configured
+      - Backup directory: {{ openclaw_backup_dir }}
+      - Backup schedule: {{ openclaw_backup_cron_schedule }}
+      - Manual backup: {{ openclaw_backup_dir }}/backup.sh
+      - Init workspace repos: ~/bin/init-workspace-repos.sh
+  when: backup_enabled

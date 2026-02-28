@@ -35,6 +35,7 @@ Infrastructure as Code (IaC) for deploying [OpenClaw](https://openclaw.ai) on Pr
 - Git config automatically mounted
 - Claude 3.5 Sonnet configured by default (cost-optimized)
 - Workspace persistence across restarts
+- Automated backup to git repositories with cron scheduling
 
 📚 **Well Documented**
 
@@ -261,6 +262,27 @@ No manual `openclaw configure` command needed when deploying with Ansible!
 | `anthropic/claude-haiku-3`    | $0.80/$4 per 1M tokens    | Simple tasks, code reviews (75% cheaper)                |
 | `gpt-4o-mini`                 | $0.15/$0.60 per 1M tokens | Basic scripts, simple questions (90% cheaper)           |
 
+### Web Service API Keys (Optional)
+
+Enable web search, scraping, and other online tools:
+
+```yaml
+# Add to ansible/inventory/group_vars/all.yml
+braveapi_key: "BSAxxx..." # Brave Search API
+serper_api_key: "xxx..." # Serper.dev Google Search API
+firecrawl_api_key: "fc-xxx..." # Firecrawl web scraping
+```
+
+**Or configure interactively on the VM:**
+
+```bash
+ssh ubuntu@<vm-ip>
+cd /opt/openclaw
+docker compose exec openclaw-gateway openclaw configure --section web
+```
+
+These keys are also auto-configured in `auth-profiles.json` when set in Ansible.
+
 ### SSL/HTTPS Setup (Optional but Recommended)
 
 For secure HTTPS access on your local network:
@@ -283,6 +305,58 @@ openclaw_tls_key_path: "/home/ubuntu/.openclaw/certs/key.pem"
 - **Let's Encrypt:** Production-ready if you have a domain
 
 📖 **Full SSL setup guide:** [docs/SSL_SETUP.md](docs/SSL_SETUP.md)
+
+### Backup Configuration (Optional but Recommended)
+
+Automatically back up your OpenClaw configuration and workspace metadata to a git repository.
+
+**What gets backed up:**
+
+- ✅ `openclaw.json` - Main configuration
+- ✅ `devices/paired.json` - Device pairing (no secrets)
+- ✅ `.cursorrules` files - Your AI guardrails for each project
+- ❌ API keys (never committed)
+- ❌ Workspace code (use per-project git repos)
+
+**Setup:**
+
+1. Create a private GitHub repo (e.g., `openclaw-config-backup`)
+
+2. Configure in `ansible/inventory/group_vars/all.yml`:
+
+```yaml
+openclaw_backup_repo: "git@github.com:yourusername/openclaw-config-backup.git"
+
+# Optional: customize schedule (default: daily at 2 AM)
+openclaw_backup_cron_hour: "2"
+```
+
+3. Deploy with Ansible (backup will run automatically)
+
+**Manual backup:**
+
+```bash
+ssh ubuntu@<vm-ip>
+~/openclaw-backups/backup.sh
+```
+
+**Initialize workspace projects as git repos:**
+
+```bash
+ssh ubuntu@<vm-ip>
+~/bin/init-workspace-repos.sh
+```
+
+This script will:
+
+- Create git repos for each workspace project
+- Add `.gitignore` and `README.md` templates
+- Include your `.cursorrules` files
+- Make initial commits
+
+Then push each project to its own GitHub repo!
+
+📖 **Full backup documentation:** [ansible/roles/openclaw-backup/README.md](ansible/roles/openclaw-backup/README.md)
 
 ## Accessing OpenClaw
 

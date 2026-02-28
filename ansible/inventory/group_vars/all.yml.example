@@ -19,9 +19,27 @@ openclaw_install_dir: "/opt/openclaw"
 anthropic_api_key: ""  # Your Claude API key (sk-ant-...)
 openai_api_key: ""     # Your OpenAI API key (sk-...)
 
+# Web Service API Keys (optional)
+# These enable web search and other online tools
+braveapi_key: ""       # Brave Search API (https://brave.com/search/api/)
+serper_api_key: ""     # Serper.dev Google Search API (https://serper.dev/)
+firecrawl_api_key: ""  # Firecrawl web scraping API (https://firecrawl.dev/)
+
 # Default model settings
 # Set the default model ID to use
 # Examples: "anthropic/claude-sonnet-4-6", "gpt-4o", "anthropic/claude-haiku-3"
 # Recommended: "anthropic/claude-sonnet-4-6" (best balance for coding)
 # Budget options: "anthropic/claude-haiku-3" (75% cheaper) or "gpt-4o-mini" (90% cheaper)
 openclaw_default_model: ""  # Leave empty to not set a default
+
+# Backup settings (optional but recommended)
+# GitHub repo to store OpenClaw config backups
+# Example: "git@github.com:yourusername/openclaw-config-backup.git"
+# Leave empty to disable automated backups
+openclaw_backup_repo: ""
+
+# Backup schedule (cron format) - default: daily at 2 AM
+openclaw_backup_cron_minute: "0"
+openclaw_backup_cron_hour: "2"
+openclaw_backup_cron_day: "*"
+openclaw_backup_cron_weekday: "*"
