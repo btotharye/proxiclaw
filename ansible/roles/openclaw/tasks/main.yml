@@ -124,16 +124,16 @@
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: "0755"
-  when: (anthropic_api_key | default('') | length > 0) or (openai_api_key | default('') | length > 0)
+  when: (anthropic_api_key | default('') | length > 0) or (openai_api_key | default('') | length > 0) or (braveapi_key | default('') | length > 0) or (serper_api_key | default('') | length > 0) or (firecrawl_api_key | default('') | length > 0)
 
-- name: Create agent auth profiles with API keys
+- name: Create agent auth profiles with API keys (skip if using OAuth)
   copy:
     dest: "/home/{{ ansible_user }}/.openclaw/agents/main/agent/auth-profiles.json"
     content: |
       {
         "version": 1,
         "profiles": {
-          {% if anthropic_api_key %}"anthropic:default": {
+          {% if anthropic_api_key | default('') | length > 0 %}"anthropic:default": {
             "type": "api_key",
             "provider": "anthropic",
             "key": "{{ anthropic_api_key }}"
@@ -172,10 +172,10 @@
     content: |
       OPENCLAW_CONFIG_DIR=/home/{{ ansible_user }}/.openclaw
       OPENCLAW_WORKSPACE_DIR=/home/{{ ansible_user }}/.openclaw/workspace
-      {% if anthropic_api_key %}ANTHROPIC_API_KEY={{ anthropic_api_key }}
+      {% if anthropic_api_key | default('') | length > 0 %}ANTHROPIC_API_KEY={{ anthropic_api_key }}
       {% endif %}{% if openai_api_key %}OPENAI_API_KEY={{ openai_api_key }}
       {% endif %}
-      # Optional Claude web session keys (not needed for API access)
+      # Optional Claude web session keys (not needed for OAuth or API access)
       CLAUDE_AI_SESSION_KEY=
       CLAUDE_WEB_SESSION_KEY=
       CLAUDE_WEB_COOKIE=
