@@ -1,0 +1,19 @@
+---
+# OpenClaw Backup Role Defaults
+
+# Backup directory location
+openclaw_backup_dir: "/home/{{ ansible_user }}/openclaw-backups"
+
+# Git repository for backups (leave empty to disable backups)
+# Example: "git@github.com:yourusername/openclaw-config-backup.git"
+openclaw_backup_repo: ""
+
+# Backup schedule (cron format)
+# Default: Daily at 2 AM
+openclaw_backup_cron_minute: "0"
+openclaw_backup_cron_hour: "2"
+openclaw_backup_cron_day: "*"
+openclaw_backup_cron_weekday: "*"
+
+# Human-readable schedule for display
+openclaw_backup_cron_schedule: "Daily at 2:00 AM"
