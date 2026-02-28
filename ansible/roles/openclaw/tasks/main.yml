@@ -1,0 +1,201 @@
+---
+# OpenClaw application deployment role - Official Docker Setup
+- name: Create OpenClaw config directory
+  file:
+    path: "/home/{{ ansible_user }}/.openclaw"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+
+- name: Clone OpenClaw repository
+  git:
+    repo: "{{ openclaw_git_repo }}"
+    dest: "{{ openclaw_install_dir }}"
+    version: "{{ openclaw_git_branch }}"
+    update: yes
+    force: yes
+  become_user: "{{ ansible_user }}"
+
+- name: Set ownership of OpenClaw directory
+  file:
+    path: "{{ openclaw_install_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    recurse: yes
+
+- name: Build OpenClaw Docker image
+  shell: |
+    cd {{ openclaw_install_dir }}
+    docker build -t openclaw:local -f Dockerfile .
+  args:
+    creates: "{{ openclaw_install_dir }}/.docker-built"
+  become_user: "{{ ansible_user }}"
+  register: docker_build
+
+- name: Mark Docker image as built
+  file:
+    path: "{{ openclaw_install_dir }}/.docker-built"
+    state: touch
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  when: docker_build.changed
+
+- name: Check if OpenClaw has been onboarded
+  stat:
+    path: "/home/{{ ansible_user }}/.openclaw/openclaw.json"
+  register: openclaw_config
+
+- name: Create minimal OpenClaw config for local mode
+  copy:
+    dest: "/home/{{ ansible_user }}/.openclaw/openclaw.json"
+    content: |
+      {
+        "gateway": {
+          "mode": "local",
+          "bind": "lan",
+          "port": {{ openclaw_port }},
+          "controlUi": {
+            "dangerouslyAllowHostHeaderOriginFallback": true{% if not openclaw_enable_tls %},
+            "dangerouslyDisableDeviceAuth": true{% endif %}
+          }{% if openclaw_enable_tls %},
+          "tls": {
+            "enabled": true,
+            "autoGenerate": {% if openclaw_tls_cert_path and openclaw_tls_key_path %}false{% else %}true{% endif %}{% if openclaw_tls_cert_path and openclaw_tls_key_path %},
+            "certPath": "{{ openclaw_tls_cert_path }}",
+            "keyPath": "{{ openclaw_tls_key_path }}"{% endif %}
+          }{% endif %}
+        }{% if openclaw_default_model %},
+        "agents": {
+          "defaults": {
+            "model": {
+              "primary": "{{ openclaw_default_model }}"
+            }
+          }
+        }{% endif %}
+      }
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+  when: not openclaw_config.stat.exists
+
+- name: Create workspace directory
+  file:
+    path: "/home/{{ ansible_user }}/.openclaw/workspace"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0755"
+
+- name: Create agent directory structure
+  file:
+    path: "/home/{{ ansible_user }}/.openclaw/agents/main/agent"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0755"
+  when: (anthropic_api_key | default('') | length > 0) or (openai_api_key | default('') | length > 0)
+
+- name: Create agent auth profiles with API keys
+  copy:
+    dest: "/home/{{ ansible_user }}/.openclaw/agents/main/agent/auth-profiles.json"
+    content: |
+      {
+        "version": 1,
+        "profiles": {
+          {% if anthropic_api_key %}"anthropic:default": {
+            "type": "api_key",
+            "provider": "anthropic",
+            "key": "{{ anthropic_api_key }}"
+          }{% if openai_api_key %},{% endif %}
+          {% endif %}{% if openai_api_key %}"openai:default": {
+            "type": "api_key",
+            "provider": "openai",
+            "key": "{{ openai_api_key }}"
+          }{% endif %}
+        },
+        "usageStats": {}
+      }
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0600"
+  when: (anthropic_api_key | default('') | length > 0) or (openai_api_key | default('') | length > 0)
+
+- name: Create OpenClaw .env file for docker-compose
+  copy:
+    dest: "{{ openclaw_install_dir }}/.env"
+    content: |
+      OPENCLAW_CONFIG_DIR=/home/{{ ansible_user }}/.openclaw
+      OPENCLAW_WORKSPACE_DIR=/home/{{ ansible_user }}/.openclaw/workspace
+      {% if anthropic_api_key %}ANTHROPIC_API_KEY={{ anthropic_api_key }}
+      {% endif %}{% if openai_api_key %}OPENAI_API_KEY={{ openai_api_key }}
+      {% endif %}
+      # Optional Claude web session keys (not needed for API access)
+      CLAUDE_AI_SESSION_KEY=
+      CLAUDE_WEB_SESSION_KEY=
+      CLAUDE_WEB_COOKIE=
+      OPENCLAW_GATEWAY_TOKEN=
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0600"
+
+# Mount SSH keys and git config into the container so OpenClaw can:
+# - Clone private repositories via SSH
+# - Use git credentials configured on the host
+# - Authenticate with GitHub/GitLab/etc without manual configuration
+- name: Create docker-compose override for SSH and git access
+  copy:
+    dest: "{{ openclaw_install_dir }}/docker-compose.override.yml"
+    content: |
+      services:
+        openclaw-gateway:
+          volumes:
+            - /home/{{ ansible_user }}/.ssh:/home/node/.ssh:ro
+            - /home/{{ ansible_user }}/.gitconfig:/home/node/.gitconfig:ro
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+  notify: Restart OpenClaw gateway
+
+- name: Start OpenClaw gateway
+  community.docker.docker_compose_v2:
+    project_src: "{{ openclaw_install_dir }}"
+    state: present
+    services:
+      - openclaw-gateway
+  become_user: "{{ ansible_user }}"
+  register: openclaw_services
+
+- name: Wait for OpenClaw gateway to be ready
+  wait_for:
+    host: localhost
+    port: "{{ openclaw_port }}"
+    delay: 10
+    timeout: 120
+    state: started
+
+- name: Display OpenClaw access information
+  debug:
+    msg:
+      - "============================================"
+      - "OpenClaw Gateway is running successfully!"
+      - "============================================"
+      - ""
+      - "Access OpenClaw at: http://{{ ansible_facts['default_ipv4']['address'] }}:{{ openclaw_port }}"
+      - ""
+      - "The gateway is running in local mode with device auth disabled for remote access."
+      - "{{ '✓ API keys configured for agent (auto-configured during deployment)' if (anthropic_api_key | default('') | length > 0) or (openai_api_key | default('') | length > 0) else 'API keys: Not configured (add to group_vars/all.yml)' }}"
+      - "{{ '  - Anthropic (Claude): Configured' if (anthropic_api_key | default('') | length > 0) else '' }}"
+      - "{{ '  - OpenAI: Configured' if (openai_api_key | default('') | length > 0) else '' }}"
+      - "{{ '✓ Default model: ' + openclaw_default_model if (openclaw_default_model | default('') | length > 0) else 'Default model: Not set' }}"
+      - ""
+      - "Configure additional providers via the web UI or edit ~/.openclaw/openclaw.json"
+      - ""
+      - "To view logs:"
+      - "  ssh {{ ansible_user }}@{{ ansible_facts['default_ipv4']['address'] }}"
+      - "  docker compose -f {{ openclaw_install_dir }}/docker-compose.yml logs -f openclaw-gateway"
+      - ""
+      - "OpenClaw documentation: https://docs.openclaw.ai"
+      - "For SSL/HTTPS setup: docs/SSL_SETUP.md"
+      - "============================================"

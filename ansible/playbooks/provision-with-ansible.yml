@@ -1,0 +1,123 @@
+---
+# Alternative: Provision VM directly with Ansible instead of Terraform
+# This playbook uses the Proxmox Ansible module
+# Requires: ansible-galaxy collection install community.general
+
+- name: Provision VM on Proxmox with Ansible
+  hosts: localhost
+  gather_facts: false
+  vars:
+    proxmox_api_host: "192.168.1.100"
+    proxmox_api_user: "root@pam"
+    proxmox_api_token_id: "terraform"
+    proxmox_api_token_secret: "{{ vault_proxmox_token }}"
+    proxmox_node: "pve"
+    vm_id: 150
+    vm_name: "openclaw-vm"
+    vm_template: "ubuntu-2204-cloudinit"
+    vm_cores: 4
+    vm_memory: 8192
+    vm_disk_size: "50G"
+    vm_storage: "local-zfs"
+    vm_bridge: "vmbr0"
+    ssh_public_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+
+  tasks:
+    - name: Create VM from template
+      community.general.proxmox_kvm:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user }}"
+        api_token_id: "{{ proxmox_api_token_id }}"
+        api_token_secret: "{{ proxmox_api_token_secret }}"
+        node: "{{ proxmox_node }}"
+        vmid: "{{ vm_id }}"
+        name: "{{ vm_name }}"
+        clone: "{{ vm_template }}"
+        full: true
+        storage: "{{ vm_storage }}"
+        timeout: 300
+      register: vm_created
+
+    - name: Configure VM resources
+      community.general.proxmox_kvm:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user }}"
+        api_token_id: "{{ proxmox_api_token_id }}"
+        api_token_secret: "{{ proxmox_api_token_secret }}"
+        node: "{{ proxmox_node }}"
+        vmid: "{{ vm_id }}"
+        name: "{{ vm_name }}"
+        cores: "{{ vm_cores }}"
+        memory: "{{ vm_memory }}"
+        update: true
+
+    - name: Configure cloud-init
+      community.general.proxmox_kvm:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user }}"
+        api_token_id: "{{ proxmox_api_token_id }}"
+        api_token_secret: "{{ proxmox_api_token_secret }}"
+        node: "{{ proxmox_node }}"
+        vmid: "{{ vm_id }}"
+        ciuser: "ubuntu"
+        sshkeys: "{{ ssh_public_key }}"
+        ipconfig:
+          ipconfig0: "ip=dhcp"
+        update: true
+
+    - name: Start VM
+      community.general.proxmox_kvm:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user }}"
+        api_token_id: "{{ proxmox_api_token_id }}"
+        api_token_secret: "{{ proxmox_api_token_secret }}"
+        node: "{{ proxmox_node }}"
+        vmid: "{{ vm_id }}"
+        state: started
+
+    - name: Wait for VM to get IP address
+      community.general.proxmox_kvm:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user }}"
+        api_token_id: "{{ proxmox_api_token_id }}"
+        api_token_secret: "{{ proxmox_api_token_secret }}"
+        node: "{{ proxmox_node }}"
+        vmid: "{{ vm_id }}"
+      register: vm_info
+      until: vm_info.msg is defined and 'ip' in vm_info.msg
+      retries: 30
+      delay: 10
+
+    - name: Display VM information
+      debug:
+        msg:
+          - "VM created successfully!"
+          - "VM ID: {{ vm_id }}"
+          - "VM Name: {{ vm_name }}"
+          - "Node: {{ proxmox_node }}"
+          - "Check Proxmox console for IP address"
+
+    - name: Add VM to inventory for subsequent configuration
+      add_host:
+        name: "{{ vm_name }}"
+        groups: openclaw
+        ansible_host: "{{ vm_info.msg.ip | default('check-proxmox') }}"
+        ansible_user: ubuntu
+        ansible_ssh_private_key_file: "~/.ssh/id_rsa"
+
+# Follow up with system configuration
+- name: Configure provisioned VM
+  hosts: openclaw
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Wait for system to be ready
+      wait_for_connection:
+        timeout: 300
+        delay: 10
+
+  roles:
+    - common
+    - docker
+    - openclaw

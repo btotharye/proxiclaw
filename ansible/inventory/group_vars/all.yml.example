@@ -1,0 +1,25 @@
+# OpenClaw Ansible Configuration
+# Copy this file to all.yml and customize for your deployment
+
+# SSH settings
+ansible_user: "ubuntu"
+ansible_ssh_private_key_file: "~/.ssh/id_rsa"
+
+# OpenClaw repository and version
+openclaw_git_repo: "https://github.com/openclaw/openclaw.git"
+openclaw_git_branch: "main"  # or specific version tag
+
+# OpenClaw service configuration
+openclaw_port: 18789
+openclaw_install_dir: "/opt/openclaw"
+
+# API Keys (Option 1: Set here for automated deployment)
+# These will be added to the .env file
+# Leave empty to skip automatic configuration
+anthropic_api_key: ""  # Your Claude API key (sk-ant-...)
+openai_api_key: ""     # Your OpenAI API key (sk-...)
+
+# Default model settings
+# Set the default model ID to use
+# Examples: "claude-3-7-sonnet-20250219", "gpt-4o", "claude-opus-4-20250514"
+openclaw_default_model: ""  # Leave empty to not set a default

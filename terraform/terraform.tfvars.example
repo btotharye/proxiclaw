@@ -1,0 +1,28 @@
+# Proxmox Connection Settings
+proxmox_host              = "192.168.1.100:8006"
+proxmox_api_token_id      = "root@pam!terraform"
+proxmox_api_token_secret  = "your-secret-token-here"
+proxmox_node              = "pve"  # Your Proxmox node name
+
+# VM Configuration
+vm_name           = "openclaw-vm"
+template_name     = "ubuntu-2204-cloudinit"  # Name of your cloud-init template
+vm_cores          = 4
+vm_memory         = 8192  # 8GB
+vm_disk_size      = "50G"
+vm_storage        = "local-lvm"
+vm_network_bridge = "vmbr0"
+
+# Network Configuration
+# Option 1: DHCP (leave empty)
+vm_ip_config = ""
+
+# Option 2: Static IP (uncomment and configure)
+# vm_ip_config = "ip=192.168.1.150/24,gw=192.168.1.1"
+
+# Cloud-init User
+vm_user     = "ubuntu"
+vm_password = ""  # Optional: leave empty to use SSH keys only
+
+# SSH Key
+ssh_public_key_file = "~/.ssh/id_rsa.pub"

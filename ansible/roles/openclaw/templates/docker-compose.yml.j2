@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  openclaw:
+    image: {{ openclaw_docker_image | default('openclaw:' + openclaw_version) }}
+    container_name: openclaw
+    restart: unless-stopped
+    ports:
+      - "{{ openclaw_port }}:{{ openclaw_port }}"
+    environment:
+{% for key, value in openclaw_env_vars.items() %}
+      {{ key }}: "{{ value }}"
+{% endfor %}
+    volumes:
+      - {{ openclaw_data_dir }}:/data
+      - {{ openclaw_install_dir }}/logs:/logs
+    networks:
+      - openclaw-network
+
+  # Add additional services as needed (database, redis, etc.)
+  # Example: postgres
+  # postgres:
+  #   image: postgres:15
+  #   container_name: openclaw-db
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_USER: openclaw
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD}
+  #     POSTGRES_DB: openclaw
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   networks:
+  #     - openclaw-network
+
+networks:
+  openclaw-network:
+    driver: bridge
+
+volumes:
+  postgres-data:

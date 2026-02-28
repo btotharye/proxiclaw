@@ -1,0 +1,30 @@
+---
+# Main playbook - orchestrates all deployment steps
+- name: Deploy OpenClaw on Proxmox VM
+  hosts: openclaw
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Wait for system to be ready
+      wait_for_connection:
+        timeout: 300
+        delay: 10
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+  roles:
+    - common
+    - docker
+    - openclaw
+
+  post_tasks:
+    - name: Display deployment information
+      debug:
+        msg:
+          - "OpenClaw deployment completed!"
+          - "Access your application at: http://{{ ansible_facts['default_ipv4']['address'] }}:{{ openclaw_port }}"
+          - "Installation directory: {{ openclaw_install_dir }}"
