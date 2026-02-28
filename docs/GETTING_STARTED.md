@@ -5,6 +5,7 @@ Guide for using OpenClaw as your AI coding assistant.
 ## Table of Contents
 
 - [First Steps](#first-steps)
+- [Changing Models](#changing-models)
 - [Understanding OpenClaw](#understanding-openclaw)
 - [Basic Usage](#basic-usage)
 - [Git Repository Access](#git-repository-access)
@@ -48,6 +49,130 @@ docker compose exec openclaw-gateway openclaw configure --section model
 
 - Check logs for errors: `ssh ubuntu@<vm-ip> "docker logs openclaw-openclaw-gateway-1 --tail 50"`
 - Verify API keys in .env: See [COMMON_COMMANDS.md](COMMON_COMMANDS.md#check-api-keys)
+
+## Changing Models
+
+OpenClaw supports multiple AI models with different capabilities and costs. You can change models via CLI or config file.
+
+### Available Models
+
+| Model                         | Cost (Input/Output per 1M tokens) | Best For                                     | Speed   |
+| ----------------------------- | --------------------------------- | -------------------------------------------- | ------- |
+| `anthropic/claude-sonnet-4-6` | $3 / $15                          | **Recommended:** Balanced coding tasks       | Fast    |
+| `anthropic/claude-haiku-3`    | $0.80 / $4                        | **Budget:** Simple tasks, refactoring        | Fastest |
+| `anthropic/claude-opus-4-6`   | $15 / $75                         | **Premium:** Complex architecture, debugging | Slower  |
+| `gpt-4o`                      | $2.50 / $10                       | OpenAI alternative                           | Fast    |
+| `gpt-4o-mini`                 | $0.15 / $0.60                     | **Cheapest:** Simple tasks                   | Fastest |
+
+### Method 1: Change Default Model via CLI
+
+Change the default model for all new conversations:
+
+```bash
+ssh ubuntu@<vm-ip>
+cd /opt/openclaw
+docker compose exec openclaw-gateway openclaw config set agents.defaults.model.primary "anthropic/claude-haiku-3"
+docker compose restart openclaw-gateway
+```
+
+**Example - Switch to cheaper Haiku model:**
+
+```bash
+ssh ubuntu@192.168.30.118
+cd /opt/openclaw
+docker compose exec openclaw-gateway openclaw config set agents.defaults.model.primary "anthropic/claude-haiku-3"
+docker compose restart openclaw-gateway
+```
+
+**Example - Switch to premium Opus model:**
+
+```bash
+ssh ubuntu@192.168.30.118
+cd /opt/openclaw
+docker compose exec openclaw-gateway openclaw config set agents.defaults.model.primary "anthropic/claude-opus-4-6"
+docker compose restart openclaw-gateway
+```
+
+### Method 2: Edit Config File Directly
+
+For more control, edit the config file:
+
+```bash
+ssh ubuntu@<vm-ip>
+nano ~/.openclaw/openclaw.json
+```
+
+Change the `agents.defaults.model.primary` value:
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "anthropic/claude-haiku-3"
+      }
+    }
+  }
+}
+```
+
+Then restart:
+
+```bash
+cd /opt/openclaw
+docker compose restart openclaw-gateway
+```
+
+### Method 3: Using Ansible (Permanent)
+
+To set the default model across redeployments, update your Ansible config:
+
+**Edit:** `ansible/inventory/group_vars/all.yml`
+
+```yaml
+openclaw_default_model: "anthropic/claude-haiku-3" # or your preferred model
+```
+
+**Deploy:**
+
+```bash
+cd ansible
+ansible-playbook -i inventory/hosts playbooks/site.yml
+```
+
+### Verify Model Change
+
+Check which model is configured:
+
+```bash
+ssh ubuntu@<vm-ip> "cat ~/.openclaw/openclaw.json | grep -A 3 'model'"
+```
+
+Or check the gateway logs when it starts:
+
+```bash
+ssh ubuntu@<vm-ip> "docker logs openclaw-openclaw-gateway-1 2>&1 | grep 'agent model'"
+```
+
+You should see: `[gateway] agent model: anthropic/claude-haiku-3`
+
+### Cost Optimization Tips
+
+**To minimize costs:**
+
+1. **Use Haiku for simple tasks** - Refactoring, formatting, simple bug fixes
+2. **Use Sonnet for coding** (default) - Good balance of capability and cost
+3. **Use Opus sparingly** - Complex architecture decisions, difficult debugging
+4. **Keep conversations focused** - Start new chats for different topics
+5. **Monitor usage** - Check your API provider's dashboard regularly
+   - Anthropic: https://console.anthropic.com/settings/usage
+   - OpenAI: https://platform.openai.com/usage
+
+**Cost comparison for typical coding session:**
+
+- **Haiku:** ~$0.50-2 per day (budget option)
+- **Sonnet:** ~$2-8 per day (recommended)
+- **Opus:** ~$10-50 per day (premium)
 
 ## Understanding OpenClaw
 
