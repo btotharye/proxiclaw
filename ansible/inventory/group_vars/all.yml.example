@@ -13,10 +13,27 @@ openclaw_git_branch: "main"  # or specific version tag
 openclaw_port: 18789
 openclaw_install_dir: "/opt/openclaw"
 
-# API Keys (Option 1: Set here for automated deployment)
-# These will be added to the .env file
-# Leave empty to skip automatic configuration
-anthropic_api_key: ""  # Your Claude API key (sk-ant-...)
+# AI Provider Configuration
+# Primary provider for coding (subscription-based services require interactive OAuth setup after deployment)
+# Options:
+#   "copilot" - GitHub Copilot+ subscription (recommended if you have Copilot+)
+#   "anthropic" - Claude Pro/Max subscription (requires OAuth setup)
+#   "openai" - OpenAI with API key
+#   "api_keys_only" - Use API keys for all providers
+# See docs/AI_PROVIDER_SETUP.md for setup instructions
+primary_ai_provider: "copilot"  # Change to your preferred provider
+
+# Anthropic Authentication Method (only if primary_ai_provider is "anthropic" or "api_keys_only")
+# Options:
+#   "oauth" - Use Claude Pro/Max subscription via OAuth
+#   "api_key" - Use API key with pay-per-use credits
+#   "" - Skip auto-configuration, configure manually later
+# See docs/ANTHROPIC_OAUTH_SETUP.md for OAuth setup instructions
+anthropic_auth_method: ""  # Set to "oauth" or "api_key" if using Anthropic
+
+# API Keys (only used if auth method is "api_key" or as fallbacks)
+# For subscription services (Copilot+, Claude Pro/Max via OAuth), leave these empty
+anthropic_api_key: ""  # Your Claude API key (sk-ant-...) - only if using api_key method
 openai_api_key: ""     # Your OpenAI API key (sk-...)
 
 # Web Service API Keys (optional)

@@ -339,25 +339,48 @@ vm_user = "ubuntu"
 
 ### Ansible Variables (`ansible/inventory/group_vars/all.yml`)
 
-#### API Keys and Model Setup
+#### AI Provider Setup
 
-Configure OpenClaw with your AI provider API keys:
+OpenClaw supports multiple AI providers with different authentication methods:
+
+**Option 1: Subscription Services (Recommended for heavy usage)**
+
+Use your existing subscriptions instead of paying per token:
 
 ```yaml
-# API Keys for AI providers
-anthropic_api_key: "sk-ant-your-key-here" # Claude
-openai_api_key: "sk-proj-your-key-here" # ChatGPT
+# GitHub Copilot+ subscription
+primary_ai_provider: "copilot"
 
-# Default model (recommended for coding)
+# OR Claude Pro/Max subscription
+primary_ai_provider: "anthropic"
+anthropic_auth_method: "oauth"
+```
+
+After deployment, run interactive OAuth setup to connect your subscription.
+
+**Option 2: API Keys (Pay-per-use)**
+
+```yaml
+# Use API credits (pay per token)
+primary_ai_provider: "api_keys_only"
+anthropic_api_key: "sk-ant-your-key-here"
+openai_api_key: "sk-proj-your-key-here"
 openclaw_default_model: "anthropic/claude-sonnet-4-6"
 ```
 
-**The Ansible playbook automatically configures these API keys in both:**
+**Option 3: Mixed (Subscription + API Keys)**
 
-- Environment variables (`.env` file for Docker)
-- Agent auth profiles (`~/.openclaw/agents/main/agent/auth-profiles.json`)
+Use a subscription for primary work and API keys as fallback:
 
-No manual `openclaw configure` command needed when deploying with Ansible!
+```yaml
+primary_ai_provider: "copilot" # Or "anthropic"
+# Add API keys for other providers as needed
+openai_api_key: "sk-proj-your-key-here"
+```
+
+📖 **Complete setup guide:** [docs/AI_PROVIDER_SETUP.md](docs/AI_PROVIDER_SETUP.md)
+
+**The Ansible playbook automatically configures API keys. For subscription services (Copilot+, Claude Pro/Max), you'll complete an interactive OAuth flow after deployment.**
 
 **Recommended Models for Coding (Cost vs Performance):**
 
@@ -730,6 +753,7 @@ This project uses the `bpg/proxmox` Terraform provider instead of the older Telm
 
 ## Documentation
 
+- **[AI Provider Setup](docs/AI_PROVIDER_SETUP.md)** - Configure GitHub Copilot+, Claude Pro/Max, or API keys
 - **[Getting Started Guide](docs/GETTING_STARTED.md)** - Using OpenClaw as your AI assistant
 - **[Common Commands](docs/COMMON_COMMANDS.md)** - Quick reference for frequent tasks
 - **[SSL Setup Guide](docs/SSL_SETUP.md)** - Configure HTTPS with various methods
