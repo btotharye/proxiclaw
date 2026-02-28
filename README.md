@@ -243,7 +243,7 @@ anthropic_api_key: "sk-ant-your-key-here" # Claude
 openai_api_key: "sk-proj-your-key-here" # ChatGPT
 
 # Default model (recommended for coding)
-openclaw_default_model: "claude-3-5-sonnet-20240620"
+openclaw_default_model: "anthropic/claude-sonnet-4-6"
 ```
 
 **The Ansible playbook automatically configures these API keys in both:**
@@ -255,11 +255,11 @@ No manual `openclaw configure` command needed when deploying with Ansible!
 
 **Recommended Models for Coding (Cost vs Performance):**
 
-| Model                        | Cost                      | Use Case                                                |
-| ---------------------------- | ------------------------- | ------------------------------------------------------- |
-| `claude-3-5-sonnet-20240620` | $3/$15 per 1M tokens      | **Best value** - Complex coding, refactoring, debugging |
-| `claude-3-haiku-20240307`    | $0.25/$1.25 per 1M tokens | Simple tasks, code reviews (12x cheaper)                |
-| `gpt-4o-mini`                | $0.15/$0.60 per 1M tokens | Basic scripts, simple questions (20x cheaper)           |
+| Model                         | Cost                      | Use Case                                                |
+| ----------------------------- | ------------------------- | ------------------------------------------------------- |
+| `anthropic/claude-sonnet-4-6` | $3-4/$12-15 per 1M tokens | **Best value** - Complex coding, refactoring, debugging |
+| `anthropic/claude-haiku-3`    | $0.80/$4 per 1M tokens    | Simple tasks, code reviews (75% cheaper)                |
+| `gpt-4o-mini`                 | $0.15/$0.60 per 1M tokens | Basic scripts, simple questions (90% cheaper)           |
 
 ### SSL/HTTPS Setup (Optional but Recommended)
 
