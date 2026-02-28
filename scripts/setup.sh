@@ -68,10 +68,10 @@ else
     echo -e "${GREEN}✓ Python 3 installed${NC}"
 fi
 
-# Install Ansible community collection for Docker
+# Install required Ansible collections (Docker + Proxmox support)
 echo ""
 echo "Installing Ansible collections..."
-ansible-galaxy collection install community.docker
+ansible-galaxy collection install -r ansible/requirements.yml
 
 # Setup SSH key if it doesn't exist
 if [ ! -f ~/.ssh/id_rsa ]; then

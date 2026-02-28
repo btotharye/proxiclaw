@@ -22,6 +22,7 @@ usage() {
     echo "  --full              Full deployment (Terraform + Ansible)"
     echo "  --terraform-only    Only create VM with Terraform"
     echo "  --ansible-only      Only run Ansible configuration"
+    echo "  --ansible-provision Provision VM with Ansible (no Terraform) + configure"
     echo "  --destroy           Destroy infrastructure"
     echo "  -h, --help          Show this help message"
     echo ""
@@ -32,6 +33,7 @@ usage() {
 FULL_DEPLOY=false
 TERRAFORM_ONLY=false
 ANSIBLE_ONLY=false
+ANSIBLE_PROVISION=false
 DESTROY=false
 
 if [ $# -eq 0 ]; then
@@ -50,6 +52,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --ansible-only)
             ANSIBLE_ONLY=true
+            shift
+            ;;
+        --ansible-provision)
+            ANSIBLE_PROVISION=true
             shift
             ;;
         --destroy)
@@ -78,6 +84,28 @@ if [ "$DESTROY" = true ]; then
     else
         echo "Cancelled"
     fi
+    exit 0
+fi
+
+# Ansible-only provisioning (no Terraform)
+if [ "$ANSIBLE_PROVISION" = true ]; then
+    echo -e "${BLUE}Provisioning VM with Ansible (no Terraform)${NC}"
+
+    if [ ! -f ansible/inventory/group_vars/all.yml ]; then
+        echo -e "${RED}Error: ansible/inventory/group_vars/all.yml not found${NC}"
+        echo "Please run ./scripts/setup.sh first and configure group_vars/all.yml"
+        exit 1
+    fi
+
+    cd ansible
+    echo "Running Ansible provisioning playbook..."
+    ansible-playbook -i inventory/hosts playbooks/provision-with-ansible.yml
+    cd ..
+
+    echo ""
+    echo -e "${GREEN}==================================="
+    echo "Ansible Provisioning Complete!"
+    echo "===================================${NC}"
     exit 0
 fi
 

@@ -1,16 +1,17 @@
-.PHONY: help setup deploy deploy-full deploy-vm deploy-config destroy clean test-connection
+.PHONY: help setup deploy deploy-full deploy-vm deploy-config provision-ansible destroy clean test-connection
 
 help:
 	@echo "OpenClaw Deployment Makefile"
 	@echo ""
 	@echo "Available targets:"
-	@echo "  setup           - Install dependencies and create config files"
-	@echo "  deploy-full     - Full deployment (VM creation + configuration)"
-	@echo "  deploy-vm       - Create VM only with Terraform"
-	@echo "  deploy-config   - Configure existing VM with Ansible"
-	@echo "  test-connection - Test SSH connection to VM"
-	@echo "  destroy         - Destroy infrastructure"
-	@echo "  clean           - Clean up temporary files"
+	@echo "  setup              - Install dependencies and create config files"
+	@echo "  deploy-full        - Full deployment (VM creation via Terraform + Ansible config)"
+	@echo "  deploy-vm          - Create VM only with Terraform"
+	@echo "  deploy-config      - Configure existing VM with Ansible"
+	@echo "  provision-ansible  - Provision VM with Ansible only (no Terraform) + configure"
+	@echo "  test-connection    - Test SSH connection to VM"
+	@echo "  destroy            - Destroy infrastructure"
+	@echo "  clean              - Clean up temporary files"
 	@echo ""
 
 setup:
@@ -28,6 +29,10 @@ deploy-vm:
 deploy-config:
 	@echo "Configuring VM with Ansible..."
 	./scripts/deploy.sh --ansible-only
+
+provision-ansible:
+	@echo "Provisioning VM with Ansible (no Terraform)..."
+	./scripts/deploy.sh --ansible-provision
 
 test-connection:
 	@echo "Testing Ansible connection..."

@@ -43,3 +43,25 @@ openclaw_backup_cron_minute: "0"
 openclaw_backup_cron_hour: "2"
 openclaw_backup_cron_day: "*"
 openclaw_backup_cron_weekday: "*"
+
+# ---------------------------------------------------------------------------
+# Proxmox provisioning settings (Ansible-only path)
+# Only needed when using playbooks/provision-with-ansible.yml instead of
+# Terraform. Leave empty if you are using Terraform for VM creation.
+# Store proxmox_api_token_secret with ansible-vault:
+#   ansible-vault encrypt_string 'your-secret' --name proxmox_api_token_secret
+# ---------------------------------------------------------------------------
+proxmox_api_host: ""           # Proxmox host IP (without port), e.g. "192.168.1.100"
+proxmox_api_user: "root@pam"   # Proxmox API user
+proxmox_api_token_id: ""       # API token ID, e.g. "terraform"
+proxmox_api_token_secret: ""   # API token secret (use ansible-vault!)
+proxmox_node: "pve"            # Proxmox node name
+
+# VM settings for Ansible-only provisioning
+vm_id: 150                              # Unique VM ID to assign
+vm_name: "openclaw-vm"                  # VM display name
+vm_template: "ubuntu-2204-cloudinit"    # Clone source template name
+vm_cores: 4                             # Number of vCPU cores
+vm_memory: 8192                         # RAM in MB
+vm_storage: "local-zfs"                 # Target storage pool (from pvesm status)
+ssh_public_key_file: "~/.ssh/id_rsa.pub"  # SSH public key for VM access

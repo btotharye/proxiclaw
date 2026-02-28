@@ -2,15 +2,30 @@
 
 Complete guide for deploying OpenClaw on Proxmox.
 
+## Choosing Your Provisioning Approach
+
+This project supports two approaches for creating the Proxmox VM. Both are valid — choose the one that fits your workflow:
+
+| | **Terraform + Ansible** | **Ansible-only** |
+|---|---|---|
+| **VM Provisioning** | Terraform (state-tracked) | `community.general.proxmox_kvm` |
+| **Configuration** | Ansible | Ansible |
+| **State management** | ✅ `terraform.tfstate` tracks what was created | ❌ No built-in drift detection |
+| **Destroy VMs** | `terraform destroy` | Manual via Proxmox UI/CLI |
+| **Cloud-init / disk resize** | ✅ Full support via `bpg/proxmox` provider | ⚠️ Limited (basic cloud-init only) |
+| **Recommended for** | Production, repeatable infra | Simpler setups, Terraform not available |
+
+**Recommendation:** Use **Terraform + Ansible** if you want reproducible infrastructure with proper state tracking. Use **Ansible-only** if you prefer a single toolchain or Terraform is not available in your environment.
+
 ## Prerequisites
 
 Before starting, ensure you have:
 
 - [ ] Proxmox VE 7.0+ with API access configured
 - [ ] Ubuntu 22.04 cloud-init template created
-- [ ] Terraform installed on local machine
 - [ ] Ansible installed on local machine
 - [ ] SSH key pair generated (`~/.ssh/id_rsa`)
+- [ ] For Terraform path: Terraform >= 1.0 installed
 
 See [PROXMOX_SETUP.md](PROXMOX_SETUP.md) for detailed Proxmox preparation steps.
 
@@ -20,13 +35,28 @@ See [PROXMOX_SETUP.md](PROXMOX_SETUP.md) for detailed Proxmox preparation steps.
 
 ```bash
 # Clone or navigate to the repository
-cd openclaw
+cd proxiclaw
 
 # Run setup script (installs dependencies and creates config files)
 ./scripts/setup.sh
 ```
 
-### 2. Configure Proxmox Credentials
+### 2. Configure Application Settings
+
+Edit `ansible/inventory/group_vars/all.yml`:
+
+```yaml
+ansible_user: "ubuntu"
+ansible_ssh_private_key_file: "~/.ssh/id_rsa"
+openclaw_port: 18789
+anthropic_api_key: "sk-ant-your-key-here"
+```
+
+---
+
+## Option A: Terraform + Ansible (Recommended)
+
+### Configure Proxmox Credentials
 
 Edit `terraform/terraform.tfvars`:
 
@@ -35,27 +65,18 @@ proxmox_host              = "192.168.1.100:8006"
 proxmox_api_token_id      = "root@pam!terraform"
 proxmox_api_token_secret  = "your-secret-token"
 proxmox_node              = "pve"
-template_name             = "ubuntu-2204-cloudinit"
+template_name             = "9000"
+vm_storage                = "local-zfs"
+vm_network_bridge         = "vmbr0"
 ```
 
-### 3. Configure Application Settings
-
-Edit `ansible/inventory/group_vars/all.yml`:
-
-```yaml
-timezone: "America/New_York"
-openclaw_port: 8080
-openclaw_env_vars:
-  NODE_ENV: "production"
-  # Add your app-specific variables
-```
-
-### 4. Deploy
+### Deploy
 
 Full automated deployment:
 
 ```bash
 ./scripts/deploy.sh --full
+# or: make deploy-full
 ```
 
 Or step by step:
@@ -63,42 +84,81 @@ Or step by step:
 ```bash
 # Step 1: Create VM
 ./scripts/deploy.sh --terraform-only
+# or: make deploy-vm
 
-# Step 2: Configure and deploy
+# Step 2: Configure and deploy OpenClaw
 ./scripts/deploy.sh --ansible-only
+# or: make deploy-config
 ```
 
-## Deployment Options
-
-### Option 1: Full Automation
-
-Creates VM and configures everything:
+### Destroy Infrastructure
 
 ```bash
-./scripts/deploy.sh --full
+./scripts/deploy.sh --destroy
+# or: make destroy
 ```
 
-### Option 2: Manual VM Creation
+---
 
-If you prefer to create the VM manually:
+## Option B: Ansible-only (No Terraform)
 
-1. Create Ubuntu 22.04 VM in Proxmox
-2. Note the IP address
-3. Update `ansible/inventory/hosts`:
-   ```ini
-   [openclaw]
-   192.168.1.150 ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa
-   ```
-4. Run Ansible:
-   ```bash
-   ./scripts/deploy.sh --ansible-only
-   ```
+Use this path when you want a single-tool workflow or Terraform is not available.
 
-### Option 3: Configuration Only (Existing VM)
+### Configure Proxmox Connection in group_vars
 
-If you already have Ubuntu installed:
+Edit `ansible/inventory/group_vars/all.yml` and fill in the Proxmox provisioning section:
+
+```yaml
+proxmox_api_host: "192.168.1.100"
+proxmox_api_user: "root@pam"
+proxmox_api_token_id: "terraform"
+proxmox_api_token_secret: "your-secret"   # use ansible-vault for this!
+proxmox_node: "pve"
+
+vm_id: 150
+vm_name: "openclaw-vm"
+vm_template: "ubuntu-2204-cloudinit"
+vm_cores: 4
+vm_memory: 8192
+vm_storage: "local-zfs"
+ssh_public_key_file: "~/.ssh/id_rsa.pub"
+```
+
+Protect the token secret with Ansible Vault:
 
 ```bash
+ansible-vault encrypt_string 'your-token-secret' --name proxmox_api_token_secret
+# Paste the output into all.yml
+```
+
+### Install Required Collections
+
+```bash
+cd ansible
+ansible-galaxy collection install -r requirements.yml
+```
+
+### Provision and Configure
+
+```bash
+./scripts/deploy.sh --ansible-provision
+# or: make provision-ansible
+```
+
+This runs `playbooks/provision-with-ansible.yml` which provisions the VM **and** runs the full configuration (common, docker, openclaw, openclaw-backup roles) in one step.
+
+---
+
+## Option C: Configuration Only (Existing VM)
+
+If you already have Ubuntu installed on a VM:
+
+```bash
+# 1. Update inventory with your VM IP
+cp ansible/inventory/hosts.example ansible/inventory/hosts
+# Edit ansible/inventory/hosts
+
+# 2. Run configuration playbook
 cd ansible
 ansible-playbook -i inventory/hosts playbooks/site.yml
 ```
@@ -113,50 +173,15 @@ Edit `ansible/inventory/group_vars/all.yml`:
 openclaw_docker_image: "your-registry/openclaw:v1.0"
 ```
 
-### Additional Services
-
-Edit `ansible/roles/openclaw/templates/docker-compose.yml.j2` to add services like:
-
-- PostgreSQL
-- Redis
-- Nginx reverse proxy
-
-Example:
-
-```yaml
-services:
-  openclaw:
-    # existing config...
-    depends_on:
-      - postgres
-      - redis
-
-  postgres:
-    image: postgres:15
-    environment:
-      POSTGRES_USER: openclaw
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: openclaw
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-
-  redis:
-    image: redis:7-alpine
-    volumes:
-      - redis-data:/data
-```
-
 ### Firewall Rules
 
 Edit `ansible/inventory/group_vars/all.yml`:
 
 ```yaml
 ufw_allow_ports:
-  - "22" # SSH
-  - "80" # HTTP
-  - "443" # HTTPS
-  - "8080" # OpenClaw
-  - "5432" # PostgreSQL (if external access needed)
+  - "22"    # SSH
+  - "443"   # HTTPS
+  - "18789" # OpenClaw
 ```
 
 ## Verification
@@ -181,28 +206,13 @@ qm status <vmid>
 ssh ubuntu@<vm-ip>
 
 # Check Docker containers
-docker ps
+cd /opt/openclaw && docker compose ps
 
 # View logs
-docker logs openclaw
+docker compose logs -f openclaw-gateway
 
 # Check service health
-curl http://localhost:8080/health
-```
-
-### Ansible Verification
-
-```bash
-cd ansible
-
-# Test connectivity
-ansible openclaw -m ping
-
-# Check Docker version
-ansible openclaw -a "docker --version"
-
-# View running containers
-ansible openclaw -a "docker ps"
+cd /opt/openclaw && docker compose exec openclaw-gateway openclaw health
 ```
 
 ## Maintenance
@@ -217,48 +227,14 @@ ansible-playbook -i inventory/hosts playbooks/site.yml --tags openclaw
 ### Restart Services
 
 ```bash
-ssh ubuntu@<vm-ip>
-cd /opt/openclaw
-docker-compose restart
+ssh ubuntu@<vm-ip> "cd /opt/openclaw && docker compose restart"
 ```
 
 ### View Logs
 
 ```bash
-ssh ubuntu@<vm-ip>
-
-# Application logs
-docker logs -f openclaw
-
-# System logs
-tail -f /opt/openclaw/logs/app.log
+ssh ubuntu@<vm-ip> "docker logs openclaw-openclaw-gateway-1 -f"
 ```
-
-### Backup
-
-```bash
-# Backup data directory
-ssh ubuntu@<vm-ip>
-sudo tar -czf openclaw-backup-$(date +%Y%m%d).tar.gz /var/lib/openclaw
-
-# Or use Proxmox backup
-ssh root@proxmox-host
-vzdump <vmid> --mode snapshot --storage local
-```
-
-## Destroying Infrastructure
-
-To remove everything:
-
-```bash
-./scripts/deploy.sh --destroy
-```
-
-This will destroy the Terraform-created VM. Manual cleanup may be needed for:
-
-- DNS records
-- Firewall rules
-- Backups
 
 ## Troubleshooting
 
@@ -276,7 +252,7 @@ terraform show  # View current state
 
 - Verify API token is correct
 - Check firewall allows port 8006
-- Ensure network connectivity
+- Ensure SSH agent has your key: `ssh-add -L`
 
 ### Ansible Issues
 
@@ -293,53 +269,11 @@ ansible-inventory -i ansible/inventory/hosts --list
 ansible-playbook -vvv -i ansible/inventory/hosts playbooks/site.yml
 ```
 
-**Docker installation fails**:
-
-```bash
-# Run specific role
-ansible-playbook -i ansible/inventory/hosts playbooks/site.yml --tags docker
-```
-
-### Application Issues
-
-**Service won't start**:
-
-```bash
-# Check Docker logs
-docker logs openclaw
-
-# Check environment variables
-docker exec openclaw env
-
-# Restart service
-docker-compose restart
-```
-
-**Port conflict**:
-
-- Change `openclaw_port` in `ansible/inventory/group_vars/all.yml`
-- Re-run Ansible playbook
-
-**Database connection fails**:
-
-- Verify database container is running: `docker ps`
-- Check database logs: `docker logs <db-container>`
-- Verify connection string in environment variables
-
-## Advanced Topics
-
 ### Using Ansible Vault for Secrets
 
 ```bash
 # Create encrypted variables file
 ansible-vault create ansible/inventory/group_vars/vault.yml
-
-# Add secrets:
-# vault_db_password: secret123
-# vault_api_key: abc123
-
-# Reference in all.yml:
-# db_password: "{{ vault_db_password }}"
 
 # Run with vault
 ansible-playbook -i ansible/inventory/hosts playbooks/site.yml --ask-vault-pass
@@ -365,36 +299,11 @@ Deploy to specific environment:
 ansible-playbook -i ansible/inventory/production playbooks/site.yml
 ```
 
-### CI/CD Integration
-
-Example GitLab CI:
-
-```yaml
-deploy:
-  stage: deploy
-  script:
-    - cd terraform && terraform init && terraform apply -auto-approve
-    - cd ../ansible
-    - ansible-playbook -i inventory/hosts playbooks/site.yml
-  only:
-    - main
-```
-
 ## Support
 
 For issues or questions:
 
 1. Check the [Troubleshooting](#troubleshooting) section
 2. Review logs as described in [Maintenance](#maintenance)
-3. Open an issue with:
-   - Error messages
-   - Relevant logs
-   - Steps to reproduce
+3. Open an issue with error messages and steps to reproduce
 
-## Next Steps
-
-- [ ] Configure monitoring (Prometheus, Grafana)
-- [ ] Set up automated backups
-- [ ] Configure SSL/TLS certificates
-- [ ] Set up log aggregation
-- [ ] Configure alerting

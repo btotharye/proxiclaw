@@ -163,16 +163,19 @@ Once running:
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for advanced topics.
 
-## Alternative: Ansible-Only Provisioning
+## Alternative: Ansible-only Provisioning
 
-Don't want to use Terraform? Use Ansible to provision VMs:
+Don't want to use Terraform? Use Ansible to provision and configure the VM in one step:
+
+1. Configure Proxmox connection vars in `ansible/inventory/group_vars/all.yml` (see the Proxmox provisioning section in `all.yml.example`)
+2. Run:
 
 ```bash
-cd ansible
-ansible-playbook playbooks/provision-with-ansible.yml
+./scripts/deploy.sh --ansible-provision
+# or: make provision-ansible
 ```
 
-Edit variables in the playbook first!
+See [DEPLOYMENT.md](DEPLOYMENT.md) for a full comparison of both approaches.
 
 ## Need Help?
 

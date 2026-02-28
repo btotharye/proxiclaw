@@ -1,26 +1,15 @@
 ---
 # Alternative: Provision VM directly with Ansible instead of Terraform
 # This playbook uses the Proxmox Ansible module
-# Requires: ansible-galaxy collection install community.general
+# Requires: ansible-galaxy collection install -r requirements.yml
+#
+# Configure Proxmox connection and VM settings in:
+#   ansible/inventory/group_vars/all.yml
+# (see all.yml.example for the required variables)
 
 - name: Provision VM on Proxmox with Ansible
   hosts: localhost
   gather_facts: false
-  vars:
-    proxmox_api_host: "192.168.1.100"
-    proxmox_api_user: "root@pam"
-    proxmox_api_token_id: "terraform"
-    proxmox_api_token_secret: "{{ vault_proxmox_token }}"
-    proxmox_node: "pve"
-    vm_id: 150
-    vm_name: "openclaw-vm"
-    vm_template: "ubuntu-2204-cloudinit"
-    vm_cores: 4
-    vm_memory: 8192
-    vm_disk_size: "50G"
-    vm_storage: "local-zfs"
-    vm_bridge: "vmbr0"
-    ssh_public_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
 
   tasks:
     - name: Create VM from template
@@ -59,8 +48,8 @@
         api_token_secret: "{{ proxmox_api_token_secret }}"
         node: "{{ proxmox_node }}"
         vmid: "{{ vm_id }}"
-        ciuser: "ubuntu"
-        sshkeys: "{{ ssh_public_key }}"
+        ciuser: "{{ ansible_user | default('ubuntu') }}"
+        sshkeys: "{{ lookup('file', ssh_public_key_file | default('~/.ssh/id_rsa.pub')) }}"
         ipconfig:
           ipconfig0: "ip=dhcp"
         update: true
@@ -75,7 +64,7 @@
         vmid: "{{ vm_id }}"
         state: started
 
-    - name: Wait for VM to get IP address
+    - name: Wait for VM IP address to become available
       community.general.proxmox_kvm:
         api_host: "{{ proxmox_api_host }}"
         api_user: "{{ proxmox_api_user }}"
@@ -84,7 +73,7 @@
         node: "{{ proxmox_node }}"
         vmid: "{{ vm_id }}"
       register: vm_info
-      until: vm_info.msg is defined and 'ip' in vm_info.msg
+      until: vm_info.msg is defined and vm_info.msg.ip is defined
       retries: 30
       delay: 10
 
@@ -95,17 +84,18 @@
           - "VM ID: {{ vm_id }}"
           - "VM Name: {{ vm_name }}"
           - "Node: {{ proxmox_node }}"
-          - "Check Proxmox console for IP address"
+          - "Check Proxmox console for IP address if not shown below"
+          - "VM IP: {{ vm_info.msg.ip | default('check-proxmox-console') }}"
 
-    - name: Add VM to inventory for subsequent configuration
+    - name: Add VM to in-memory inventory for subsequent configuration
       add_host:
         name: "{{ vm_name }}"
         groups: openclaw
-        ansible_host: "{{ vm_info.msg.ip | default('check-proxmox') }}"
-        ansible_user: ubuntu
-        ansible_ssh_private_key_file: "~/.ssh/id_rsa"
+        ansible_host: "{{ vm_info.msg.ip | default(omit) }}"
+        ansible_user: "{{ ansible_user | default('ubuntu') }}"
+        ansible_ssh_private_key_file: "{{ ansible_ssh_private_key_file | default('~/.ssh/id_rsa') }}"
 
-# Follow up with system configuration
+# Follow up with full system configuration
 - name: Configure provisioned VM
   hosts: openclaw
   become: true
@@ -117,7 +107,22 @@
         timeout: 300
         delay: 10
 
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
   roles:
     - common
     - docker
     - openclaw
+    - openclaw-backup
+
+  post_tasks:
+    - name: Display deployment information
+      debug:
+        msg:
+          - "OpenClaw deployment completed!"
+          - "Access your application at: http://{{ ansible_facts['default_ipv4']['address'] }}:{{ openclaw_port }}"
+          - "Installation directory: {{ openclaw_install_dir }}"
+
