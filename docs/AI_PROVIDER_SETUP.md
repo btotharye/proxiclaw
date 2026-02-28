@@ -6,11 +6,12 @@ This guide covers how to configure different AI providers with OpenClaw, includi
 
 Choose your preferred authentication method:
 
-| Provider           | Best For                   | Setup Method               | Guide                                                     |
-| ------------------ | -------------------------- | -------------------------- | --------------------------------------------------------- |
-| **GitHub Copilot** | Copilot+ subscribers       | Interactive OAuth          | [See below](#github-copilot-setup)                        |
-| **Anthropic**      | Claude Pro/Max subscribers | Interactive OAuth          | [docs/ANTHROPIC_OAUTH_SETUP.md](ANTHROPIC_OAUTH_SETUP.md) |
-| **API Keys**       | Pay-per-use, multiple LLMs | Auto-configured by Ansible | [See below](#api-keys-setup)                              |
+| Provider           | Best For                   | Setup Method               | Guide                              |
+| ------------------ | -------------------------- | -------------------------- | ---------------------------------- |
+| **GitHub Copilot** | Copilot+ subscribers       | Interactive OAuth          | [See below](#github-copilot-setup) |
+| **API Keys**       | Pay-per-use, multiple LLMs | Auto-configured by Ansible | [See below](#api-keys-setup)       |
+
+> **Note:** Claude/Anthropic only supports API key authentication. OAuth is not available.
 
 ---
 
@@ -135,11 +136,13 @@ GitHub Copilot provides access to various models through your subscription.
 
 **Typical Copilot+ models (may vary by subscription level):**
 
-- GPT-4 Turbo
-- GPT-4o
+- **Claude Sonnet 4.6** (github-copilot/claude-sonnet-4.6) - **Recommended for coding**
+- GPT-4o (github-copilot/gpt-4o)
+- GPT-4 Turbo (github-copilot/gpt-4-turbo)
 - GPT-3.5 Turbo
-- Claude 3.5 Sonnet (if enabled)
 - And others depending on your Copilot tier
+
+> **💡 Pro Tip:** Claude Sonnet 4.6 is available through Copilot+ at no extra cost! This is the same model that costs $3-15 per 1M tokens via Anthropic's API.
 
 **Check what models you have access to:**
 
@@ -155,17 +158,20 @@ docker compose exec openclaw-gateway openclaw models list | grep -i copilot
 ssh ubuntu@<vm-ip>
 cd /opt/openclaw
 
-# Example: Set GPT-4o as default
-docker compose exec openclaw-gateway openclaw config set agents.defaults.model.primary "copilot/gpt-4o"
+# Recommended: Claude Sonnet 4.6 (best for coding)
+docker compose exec openclaw-gateway openclaw config set agents.defaults.model.primary "github-copilot/claude-sonnet-4.6"
+
+# Or GPT-4o
+docker compose exec openclaw-gateway openclaw config set agents.defaults.model.primary "github-copilot/gpt-4o"
 
 # Or GPT-4 Turbo
-docker compose exec openclaw-gateway openclaw config set agents.defaults.model.primary "copilot/gpt-4-turbo"
+docker compose exec openclaw-gateway openclaw config set agents.defaults.model.primary "github-copilot/gpt-4-turbo"
 
 # Restart to apply
 docker compose restart openclaw-gateway
 ```
 
-> **💡 Tip:** Start with GPT-4o or GPT-4 Turbo. These are the most capable models for coding. You can switch anytime based on your needs.
+> **💡 Tip:** Start with **Claude Sonnet 4.6** - it's the most capable coding model and included in your Copilot+ subscription. You can switch anytime based on your needs.
 
 **Using different models per conversation:**
 
@@ -188,22 +194,18 @@ A: For coding, recommend **GPT-4o** or **GPT-4 Turbo**. These are the most capab
 A: Yes, requests count toward your Copilot subscription limits (e.g., 50-100 requests/month for Individual, unlimited for Enterprise). However, it's still much better than paying per token with API keys.
 
 **Q: Can I use multiple providers at once (e.g., Copilot + Claude API)?**
-A: Yes! See [Mixed Configuration](#mixed-configuration-subscription--api-keys) below.
+A: Yes! See [Mixed Configuration](#mixed-configuration-copilot--api-keys) below.
 
 **Q: What if I run out of Copilot requests?**
 A: Configure fallback API keys. OpenClaw can automatically fall back to API-based models when your Copilot quota is reached.
 
 ---
 
-## Anthropic OAuth Setup (Claude Pro/Max)
-
-See dedicated guide: [ANTHROPIC_OAUTH_SETUP.md](ANTHROPIC_OAUTH_SETUP.md)
-
----
-
 ## API Keys Setup
 
 For pay-per-use with multiple providers, use API keys.
+
+> **Note:** Claude/Anthropic only supports API key authentication. There is no OAuth/subscription option available.
 
 ### Configuration
 
@@ -212,7 +214,6 @@ For pay-per-use with multiple providers, use API keys.
 ```yaml
 # Use API keys for all providers
 primary_ai_provider: "api_keys_only"
-anthropic_auth_method: "api_key"
 
 # Add your API keys
 anthropic_api_key: "sk-ant-your-key-here"
@@ -253,7 +254,6 @@ You can use a subscription for your primary provider and API keys for others.
 primary_ai_provider: "copilot"
 
 # Add API keys for fallback/specific use cases
-anthropic_auth_method: "api_key"
 anthropic_api_key: "sk-ant-your-key-here"
 openai_api_key: "sk-proj-your-key-here"
 ```
@@ -298,7 +298,6 @@ docker compose exec openclaw-gateway openclaw configure --section model
    ```yaml
    primary_ai_provider: "api_keys_only"
    anthropic_api_key: "sk-ant-your-key-here"
-   anthropic_auth_method: "api_key"
    ```
 
 2. **Re-run Ansible:**
@@ -448,7 +447,6 @@ docker compose exec openclaw-gateway openclaw models list
 
 ## See Also
 
-- [Anthropic OAuth Setup](ANTHROPIC_OAUTH_SETUP.md) - Detailed Claude Pro/Max setup
 - [Getting Started](GETTING_STARTED.md) - Using OpenClaw
 - [Common Commands](COMMON_COMMANDS.md) - Quick reference
 - [Cost Optimization](COST_OPTIMIZATION.md) - Reduce API costs

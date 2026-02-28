@@ -343,17 +343,13 @@ vm_user = "ubuntu"
 
 OpenClaw supports multiple AI providers with different authentication methods:
 
-**Option 1: Subscription Services (Recommended for heavy usage)**
+**Option 1: GitHub Copilot+ Subscription (Recommended for heavy usage)**
 
-Use your existing subscriptions instead of paying per token:
+Use your GitHub Copilot+ subscription instead of paying per token:
 
 ```yaml
 # GitHub Copilot+ subscription
 primary_ai_provider: "copilot"
-
-# OR Claude Pro/Max subscription
-primary_ai_provider: "anthropic"
-anthropic_auth_method: "oauth"
 ```
 
 After deployment, run interactive OAuth setup to connect your subscription.
@@ -363,24 +359,27 @@ After deployment, run interactive OAuth setup to connect your subscription.
 ```yaml
 # Use API credits (pay per token)
 primary_ai_provider: "api_keys_only"
-anthropic_api_key: "sk-ant-your-key-here"
+anthropic_api_key: "sk-ant-your-key-here" # Claude requires API key
 openai_api_key: "sk-proj-your-key-here"
 openclaw_default_model: "anthropic/claude-sonnet-4-6"
 ```
 
-**Option 3: Mixed (Subscription + API Keys)**
+**Option 3: Mixed (Copilot + API Keys)**
 
-Use a subscription for primary work and API keys as fallback:
+Use Copilot subscription for primary work and API keys as fallback:
 
 ```yaml
-primary_ai_provider: "copilot" # Or "anthropic"
+primary_ai_provider: "copilot"
 # Add API keys for other providers as needed
-openai_api_key: "sk-proj-your-key-here"
+anthropic_api_key: "sk-ant-your-key-here" # Claude fallback
+openai_api_key: "sk-proj-your-key-here" # OpenAI fallback
 ```
 
 📖 **Complete setup guide:** [docs/AI_PROVIDER_SETUP.md](docs/AI_PROVIDER_SETUP.md)
 
-**The Ansible playbook automatically configures API keys. For subscription services (Copilot+, Claude Pro/Max), you'll complete an interactive OAuth flow after deployment.**
+**The Ansible playbook automatically configures API keys. For GitHub Copilot+, you'll complete an interactive OAuth flow after deployment.**
+
+> **💡 Note:** Claude Sonnet 4.6 is available through GitHub Copilot+ subscription at no extra cost!
 
 **Recommended Models for Coding (Cost vs Performance):**
 
