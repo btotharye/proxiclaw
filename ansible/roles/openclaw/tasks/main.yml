@@ -80,6 +80,35 @@
     mode: "0644"
   when: not openclaw_config.stat.exists
 
+- name: Update default model in existing config
+  shell: |
+    python3 -c "
+    import json
+    config_path = '/home/{{ ansible_user }}/.openclaw/openclaw.json'
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        if 'agents' not in config:
+            config['agents'] = {}
+        if 'defaults' not in config['agents']:
+            config['agents']['defaults'] = {}
+        if 'model' not in config['agents']['defaults']:
+            config['agents']['defaults']['model'] = {}
+        config['agents']['defaults']['model']['primary'] = '{{ openclaw_default_model }}'
+        with open(config_path, 'w') as f:
+            json.dump(config, f, indent=2)
+        print('Updated model to {{ openclaw_default_model }}')
+    except Exception as e:
+        print(f'Error: {e}')
+        exit(1)
+    "
+  when:
+    - openclaw_config.stat.exists
+    - openclaw_default_model | default('') | length > 0
+  become_user: "{{ ansible_user }}"
+  register: model_update
+  changed_when: "'Updated model' in model_update.stdout"
+
 - name: Create workspace directory
   file:
     path: "/home/{{ ansible_user }}/.openclaw/workspace"
