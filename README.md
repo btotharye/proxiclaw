@@ -4,98 +4,164 @@
 
 Infrastructure as Code (IaC) for deploying [OpenClaw](https://openclaw.ai) on Proxmox VE. From zero to AI coding assistant in minutes.
 
-## What is this?
+## What is Proxiclaw?
 
-**Proxiclaw** automates the complete setup of OpenClaw (an AI coding assistant) on Proxmox infrastructure:
+**Proxiclaw** automates the complete setup of OpenClaw (an AI-powered coding assistant) on your Proxmox infrastructure using a two-phase deployment approach:
 
-- 🏗️ **Terraform**: Provisions Ubuntu VMs on Proxmox with cloud-init
-- ⚙️ **Ansible**: Installs Docker, deploys OpenClaw, configures TLS/auth
-- 🔐 **Security**: Auto-configured HTTPS with device authentication
-- 🔑 **Git Integration**: Automatic SSH key mounting for private repos
-- 📦 **Complete**: API keys, models, and workspace ready out of the box
+**Phase 1: Terraform** → Creates and provisions Ubuntu VMs on Proxmox
+**Phase 2: Ansible** → Installs and configures OpenClaw with all dependencies
+
+The result: A fully functional, secure AI coding assistant with HTTPS, authentication, git integration, and automated backups - all configured automatically.
+
+## Architecture Overview
+
+### Why Two Tools?
+
+This project uses Terraform and Ansible for different purposes, following infrastructure best practices:
+
+**🏗️ Terraform: Infrastructure Provisioning**
+
+- **What it does:** Creates virtual machines on Proxmox
+- **Handles:** VM resources (CPU, memory, disk), networking, cloud-init configuration
+- **Output:** A running Ubuntu 22.04 VM ready for software installation
+- **Runs:** Once to provision the VM (or to modify/destroy infrastructure)
+
+**⚙️ Ansible: Configuration Management**
+
+- **What it does:** Configures the VM and installs OpenClaw
+- **Handles:** Docker installation, OpenClaw deployment, TLS setup, API keys, backups
+- **Output:** Fully configured OpenClaw instance with all integrations working
+- **Runs:** Once for initial setup, or repeatedly to update configuration (idempotent)
+
+**The Flow:**
+
+```
+Terraform → Creates VM on Proxmox → Gets IP address
+    ↓
+Ansible → Connects to VM → Installs everything → OpenClaw ready!
+```
+
+### What You Get
+
+- 🔐 **Security**: HTTPS with auto-generated TLS certificates and token-based authentication
+- 🔑 **Git Integration**: Automatic SSH key mounting for private repository access
+- 🤖 **AI Models**: Claude 3.5 Sonnet configured by default (cost-optimized)
+- 💾 **Backups**: Automated configuration backups to git repositories
+- 📦 **Complete Setup**: API keys, models, and workspace ready out of the box
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Detailed Setup Guide](#detailed-setup-guide) - First-time Proxmox configuration
+- [Configuration](#configuration) - Terraform and Ansible variables
+- [Accessing OpenClaw](#accessing-openclaw) - Authentication and device pairing
+- [Troubleshooting](#troubleshooting)
+- [Documentation](#documentation) - Additional guides
+
+---
 
 ## Features
 
-✨ **Fully Automated**
+✨ **Fully Automated Deployment**
 
-- Single command deployment from Terraform → VM → OpenClaw running
+- Single command deployment: Terraform → VM → Ansible → OpenClaw running
 - Zero manual Docker or configuration required
-- Idempotent Ansible playbooks (safe to re-run)
+- Idempotent playbooks (safe to re-run and update)
 
-🔒 **Security First**
+🔒 **Production-Ready Security**
 
-- HTTPS with auto-generated TLS certificates
+- HTTPS with auto-generated TLS certificates (or bring your own)
 - Token-based authentication with device pairing
 - SSH key mounting for secure git operations
-- API keys automatically configured (never in git)
+- API keys automatically configured (never stored in git)
 
-🛠️ **Developer Ready**
+🛠️ **Developer Optimized**
 
 - Private GitHub/GitLab repo access via SSH
 - Git config automatically mounted
-- Claude 3.5 Sonnet configured by default (cost-optimized)
+- Claude 3.5 Sonnet configured by default (best coding performance)
 - Workspace persistence across restarts
-- Automated backup to git repositories with cron scheduling
+- Automated configuration backups to git
 
-📚 **Well Documented**
+📚 **Comprehensive Documentation**
 
-- Step-by-step setup guides
+- Step-by-step setup guides for every component
 - Common commands reference
-- Troubleshooting section
-- SSL/TLS configuration options
+- Troubleshooting guides
+- Multiple SSL/TLS configuration options
 
 ## Quick Start
 
+**Prerequisites:** Terraform, Ansible, and a Proxmox server with API access. First time? See [Detailed Setup Guide](#detailed-setup-guide) below.
+
 ```bash
-# 1. Clone and configure
+# 1. Clone and navigate to the project
 git clone https://github.com/btotharye/proxiclaw.git
 cd proxiclaw
+
+# 2. Configure Terraform (tells it HOW to create the VM)
 cp terraform/terraform.tfvars.example terraform/terraform.tfvars
+vim terraform/terraform.tfvars  # Edit: Proxmox host, API token, VM specs, storage
+
+# 3. Configure Ansible (tells it WHAT to install on the VM)
 cp ansible/inventory/group_vars/all.yml.example ansible/inventory/group_vars/all.yml
+vim ansible/inventory/group_vars/all.yml  # Edit: API keys, models, SSL options
 
-# 2. Edit with your values (see Prerequisites section)
-vim terraform/terraform.tfvars
-vim ansible/inventory/group_vars/all.yml
+# 4. PHASE 1: Create VM with Terraform
+cd terraform
+terraform init
+terraform apply  # Creates Ubuntu VM on Proxmox
 
-# 3. Deploy!
-cd terraform && terraform init && terraform apply
-cd ../ansible && ansible-playbook -i inventory/hosts playbooks/site.yml
+# 5. Get the new VM's IP address
+terraform output vm_ip_address
 
-# 4. Access at https://<vm-ip>:18789
+# 6. Update Ansible inventory with the VM IP
+cd ../ansible
+vim inventory/hosts  # Add the IP from step 5
+
+# 7. PHASE 2: Install OpenClaw with Ansible
+ansible-playbook -i inventory/hosts playbooks/site.yml  # Installs Docker, OpenClaw, etc.
+
+# 8. Access OpenClaw in your browser
+# https://<vm-ip>:18789
 ```
 
-See [docs/QUICK_START.md](docs/QUICK_START.md) for detailed instructions.
+See [docs/QUICK_START.md](docs/QUICK_START.md) for detailed walkthrough with screenshots.
 
-## Overview
+---
 
-This repository contains Infrastructure as Code (IaC) for deploying OpenClaw on Proxmox:
+## Detailed Setup Guide
 
-- **Terraform**: Provisions VMs on Proxmox
-- **Ansible**: Configures Ubuntu and deploys OpenClaw
+### Prerequisites
 
-## Prerequisites
+Before running Proxiclaw, ensure you have:
 
-### Local Machine Requirements
+**On Your Local Machine:**
 
 - Terraform >= 1.0
-- Ansible >= 2.9 (install via `brew install ansible` on macOS or `pip3 install ansible`)
+- Ansible >= 2.9 (`brew install ansible` on macOS or `pip3 install ansible`)
 - Python 3.12+
-- SSH key pair for VM access (~/.ssh/id_rsa.pub)
-- ssh-agent with your key loaded (run `ssh-add ~/.ssh/id_rsa`)
+- SSH key pair (`~/.ssh/id_rsa.pub`)
+- ssh-agent with your key loaded: `ssh-add ~/.ssh/id_rsa`
 
-### Proxmox Requirements
+**On Your Proxmox Server:**
 
 - Proxmox VE 7.0+
 - API token with necessary permissions
-- Ubuntu cloud-init template (or ISO)
-- SSH access to Proxmox host (for cloud-init file uploads)
+- Ubuntu 22.04 cloud-init template (see below)
+- SSH access to Proxmox host
 - Local datastore configured to support 'snippets' content type
 - Storage for VM disks (e.g., local-zfs, local-lvm)
-- Network bridge configured (e.g., vmbr0, vmbr30)
+- Network bridge configured (e.g., vmbr0)
 
-## Initial Proxmox Host Setup
+### First-Time Proxmox Setup
 
-### Step 1: Enable SSH Key Authentication
+Complete these steps once before your first deployment:
+
+#### Step 1: Enable SSH Key Authentication
 
 Before running Terraform, you need to set up SSH key authentication to your Proxmox host (required for cloud-init file uploads):
 
@@ -232,11 +298,50 @@ rm jammy-server-cloudimg-amd64.img
 
 See [docs/PROXMOX_SETUP.md](docs/PROXMOX_SETUP.md) for detailed instructions and troubleshooting.
 
+---
+
 ## Configuration
 
-### API Keys and Model Setup
+This section covers all configuration files you'll need to edit before deployment.
 
-Configure OpenClaw with your AI provider API keys in `ansible/inventory/group_vars/all.yml`:
+### Terraform Variables (`terraform/terraform.tfvars`)
+
+Configure Proxmox connection and VM specifications:
+
+```hcl
+# Proxmox Connection
+proxmox_host = "192.168.30.11:8006"  # Your Proxmox host:port
+proxmox_node = "proxmox-1"            # Your Proxmox node name
+proxmox_api_token_id = "root@pam!terraform"
+proxmox_api_token_secret = "your-secret-token-here"
+
+# VM Configuration
+vm_name = "openclaw-vm"
+vm_cores = 4
+vm_memory = 8192
+vm_disk_size = "100G"
+
+# Storage and Network (CRITICAL: Must match your Proxmox setup)
+vm_storage = "local-zfs"        # From 'pvesm status'
+vm_network_bridge = "vmbr30"    # From 'ip link show'
+template_name = "9000"          # Your cloud-init template VM ID
+
+# SSH Configuration
+ssh_public_key_file = "~/.ssh/id_rsa.pub"
+vm_user = "ubuntu"
+```
+
+**Important Notes:**
+
+- This project uses the `bpg/proxmox` Terraform provider (actively maintained)
+- Storage and network bridge names vary by Proxmox installation - verify yours first
+- The cloud-init configuration automatically installs qemu-guest-agent
+
+### Ansible Variables (`ansible/inventory/group_vars/all.yml`)
+
+#### API Keys and Model Setup
+
+Configure OpenClaw with your AI provider API keys:
 
 ```yaml
 # API Keys for AI providers
@@ -454,52 +559,7 @@ ssh -T git@github.com
 ssh ubuntu@<vm-ip> "cd /opt/openclaw && docker compose restart openclaw-gateway"
 ```
 
-## Quick Start
-
-**Important**: Complete all steps in "Initial Proxmox Host Setup" and "Proxmox API Token Setup" sections before proceeding.
-
-### Option 1: Full Automation (VM Creation + Configuration)
-
-```bash
-# 1. Ensure prerequisites are met
-ssh-add -L  # Verify SSH key is loaded in agent
-ssh root@your-proxmox-host "pvesm status -content snippets"  # Verify snippets enabled
-
-# 2. Configure Proxmox credentials
-cd terraform
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with:
-#   - Your Proxmox host, API token, and secret
-#   - Correct storage name (vm_storage) from 'pvesm status'
-#   - Correct network bridge (vm_network_bridge) from 'ip link show'
-#   - Template VM ID (usually 9000)
-
-# 3. Create VM with Terraform
-terraform init
-terraform plan
-terraform apply
-
-# 4. Get VM IP address
-terraform output vm_ip_address
-# Or use: ssh root@proxmox-host "qm agent VM_ID network-get-interfaces"
-
-# 5. Configure and deploy with Ansible
-cd ../ansible
-# Update inventory/hosts with the VM IP from step 4
-ansible-playbook -i inventory/hosts playbooks/site.yml
-```
-
-### Option 2: Configuration Only (Ubuntu Already Installed)
-
-```bash
-# 1. Update inventory with your VM details
-cd ansible
-cp inventory/hosts.example inventory/hosts
-# Edit inventory/hosts with your VM IP and SSH details
-
-# 2. Run configuration playbook
-ansible-playbook -i inventory/hosts playbooks/site.yml
-```
+---
 
 ## Directory Structure
 
@@ -529,57 +589,11 @@ ansible-playbook -i inventory/hosts playbooks/site.yml
     └── deploy.sh
 ```
 
-## Configuration
+---
 
-### Terraform Variables
+## Manual Steps (Alternative to Terraform)
 
-Edit `terraform/terraform.tfvars` with your Proxmox-specific configuration:
-
-```hcl
-# Proxmox Connection
-proxmox_host = "192.168.30.11:8006"  # Your Proxmox host:port
-proxmox_node = "proxmox-1"            # Your Proxmox node name
-proxmox_api_token_id = "root@pam!terraform"
-proxmox_api_token_secret = "your-secret-token-here"
-
-# VM Configuration
-vm_name = "openclaw-vm"
-vm_cores = 4
-vm_memory = 8192
-vm_disk_size = "100G"
-
-# Storage and Network (CRITICAL: Must match your Proxmox setup)
-vm_storage = "local-zfs"        # From 'pvesm status'
-vm_network_bridge = "vmbr30"    # From 'ip link show'
-template_name = "9000"          # Your cloud-init template VM ID
-
-# SSH Configuration
-ssh_public_key_file = "~/.ssh/id_rsa.pub"
-vm_user = "ubuntu"
-```
-
-**Important**:
-
-- This project uses the `bpg/proxmox` Terraform provider (maintained and modern)
-- The cloud-init configuration automatically installs qemu-guest-agent and configures SSH keys
-- Storage and network bridge names vary by Proxmox installation - always verify yours first
-
-### Ansible Variables
-
-Edit `ansible/inventory/group_vars/all.yml`:
-
-```yaml
-# Application settings
-openclaw_version: "latest"
-openclaw_port: 8080
-
-# System settings
-timezone: "UTC"
-```
-
-## Manual Steps
-
-If you prefer manual VM creation:
+If you prefer to create the VM manually instead of using Terraform:
 
 1. Create Ubuntu 22.04 VM in Proxmox
 2. Note the IP address
