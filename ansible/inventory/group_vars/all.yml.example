@@ -21,5 +21,6 @@ openai_api_key: ""     # Your OpenAI API key (sk-...)
 
 # Default model settings
 # Set the default model ID to use
-# Examples: "claude-3-7-sonnet-20250219", "gpt-4o", "claude-opus-4-20250514"
+# Examples: "claude-3-5-sonnet-20240620", "gpt-4o", "claude-3-opus-20240229"
+# Recommended: "claude-3-5-sonnet-20240620" (best value for coding)
 openclaw_default_model: ""  # Leave empty to not set a default
