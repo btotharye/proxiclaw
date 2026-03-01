@@ -184,10 +184,10 @@ ssh ubuntu@<vm-ip>
 docker ps
 
 # View logs
-docker logs openclaw
+docker logs openclaw-openclaw-gateway-1
 
 # Check service health
-curl http://localhost:8080/health
+curl http://<vm-ip>:18789/health
 ```
 
 ### Ansible Verification
