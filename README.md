@@ -1,5 +1,9 @@
 # Proxiclaw 🦞
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Terraform](https://img.shields.io/badge/terraform-1.0%2B-blue)](https://www.terraform.io/)
+[![Ansible](https://img.shields.io/badge/ansible-2.9%2B-red)](https://www.ansible.com/)
+
 > Automated OpenClaw deployment on Proxmox using Terraform + Ansible. TLS, authentication, and git integration included.
 
 Infrastructure as Code (IaC) for deploying [OpenClaw](https://openclaw.ai) on Proxmox VE. From zero to AI coding assistant in minutes.
